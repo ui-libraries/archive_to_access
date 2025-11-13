@@ -1,0 +1,271 @@
+# Where to find media and which files to include
+input:
+  media_root: "/path/to/your/media"        # absolute or relative path to the AV collection
+  include_extensions: [".mp4", ".mov", ".mkv", ".mp3", ".wav", ".m4a"]
+  recurse: true                            # set to false to only scan the top-level directory
+
+# Optional audio normalization using ffmpeg
+preprocessing:
+  extract_audio: true                      # set false to transcribe original files directly
+  audio_dir: "preprocessed_audio"          # created inside the project if it doesn't exist
+  overwrite_audio: false                   # reuse existing normalized audio when available
+  sample_rate: 16000                       # Whisper default
+  audio_codec: "pcm_s16le"                 # 16-bit signed PCM WAV output
+  channels: 1                              # downmix to mono for predictable results
+
+# Whisper model and decoding options
+transcription:
+  model: "large-v3"                        # other options: tiny, base, small, medium, large, large-v3
+  device: "auto"                           # "auto", "cuda", or "cpu"
+  language: null                           # e.g., "en" for English-only decoding
+  temperature: 0.0
+  condition_on_previous_text: true
+  initial_prompt: null
+  suppress_tokens: "-1"
+
+# Output destinations and formats
+outputs:
+  base_dir: "transcripts"                  # root folder for all transcript artifacts
+  formats: ["txt", "srt", "json", "tsv"]   # choose any subset; at least one is required
+  overwrite: false                         # skip files that already have transcripts
+  writer_options:
+    max_line_width: null
+    max_line_count: null
+    highlight_words: false
+
+# Optional key frame extraction (used by extract_keyframes.py)
+keyframes:
+  enabled: false                           # set to true to generate still images per video
+  modes: ["speech_segments", "interval"]   # any subset of ["speech_segments", "interval"]
+  output_dir: "keyframes"                  # parent directory for extracted frames
+  overwrite: false                         # skip frames that already exist
+  image_extension: "jpg"
+  jpeg_quality: 2                          # ffmpeg -qscale:v value (1=best, 31=worst)
+  ffmpeg_additional_args: []               # extra CLI flags if needed
+
+  # Interval-based sampling
+  interval_seconds: 3.0
+  max_interval_frames: null                # cap the number of interval frames (optional)
+
+  # Speech-segment-based sampling (requires transcripts)
+  speech_segment_format: "tsv"             # "tsv" or "json"
+  speech_segment_dir: null                 # override auto-detected transcript directory
+  max_speech_frames: null                  # cap number of segment-centered frames
+
+  max_total_frames: null                   # limit combined frames per video (optional)
+
+# Optional GPT vision frame descriptions (used by describe_frames.py)
+frame_descriptions:
+  enabled: false                           # set true to describe frames with GPT-Vision
+  model: "gpt-4o"                          # vision-capable OpenAI model
+  api_key_env: "OPENAI_API_KEY"            # environment variable for the API key
+  frames_root: null                        # override auto-detected keyframe directory
+  output_dir: "frame_descriptions"         # output folder (mirrors keyframes structure)
+  overwrite: false                         # skip descriptions already generated
+  max_frames_per_item: 40
+  max_transcript_chars: 6000               # transcript context truncation
+  temperature: 0.2
+  prompt_template: |
+    Describe what is depicted in this archival video frame in no more than 20 words.
+    {metadata_block}
+    Transcript (truncated if long):
+    {transcript}
+    Timestamp: {timestamp_seconds:.2f} seconds.
+  system_prompt: >
+    You are an archivist describing individual frames from historical audio-visual materials.
+    Focus on neutral, factual, and concise descriptions. Mention any on-screen text verbatim when possible.
+  metadata_csv: null
+  metadata_id_column: "ID"
+  metadata_fields: ["ELECTION", "PARTY", "FIRST_NAME", "LAST_NAME", "TITLE"]
+  metadata_missing_fallback: "Archival metadata unavailable."
+  transcript_format: "txt"
+  transcripts_subdir: null
+  transcript_missing_fallback: "Transcript unavailable."
+
+# Optional transcript/entity/topic tagging (used by generate_tags.py)
+tagging:
+  enabled: false
+  model: "gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+  transcript_format: "txt"
+  transcripts_subdir: null
+  output_dir: "tags"
+  overwrite: false
+  max_transcript_chars: 8000
+  response_format: "json"
+  prompt_template: |
+    Identify key named entities (people, organizations, locations), topical keywords, and summary tags
+    that will help archivists describe this archival audiovisual item.
+    Provide 3-8 concise entries per category when possible.
+    Transcript:
+    {transcript}
+  system_prompt: >
+    You are an archivist creating structured metadata. Return JSON with fields:
+    {{"entities": [{{"type": "...", "label": "..."}}, ...],
+      "topics": ["...", "..."],
+      "keywords": ["...", "..."]}}.
+  metadata_csv: null
+  metadata_id_column: "ID"
+  metadata_fields: ["ELECTION", "PARTY", "FIRST_NAME", "LAST_NAME", "TITLE"]
+  metadata_missing_fallback: "Archival metadata unavailable."
+
+# Optional collection-level synthesis (used by collection_report.py)
+collection_reports:
+  enabled: false
+  model: "gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+  summaries_dir: "summaries"
+  tags_dir: "tags"
+  output_path: "collection_report.md"
+  max_items: 200
+  prompt_template: |
+    Produce a concise research briefing summarizing patterns in the provided summaries and tags.
+    Highlight dominant themes, notable entities, and temporal or partisan contrasts.
+    Data:
+    {collection_data}
+  system_prompt: >
+    You write analytical yet neutral reports for library staff managing large audiovisual collections.
+  temperature: 0.2
+
+# Optional accessibility outputs (used by generate_accessibility.py)
+accessibility:
+  enabled: false
+  model: "gpt-4o-mini"
+  api_key_env: "OPENAI_API_KEY"
+  transcript_format: "txt"
+  frame_descriptions_dirs: null
+  output_dir: "accessibility_notes"
+  overwrite: false
+  max_transcript_chars: 8000
+  prompt_template: |
+    Create concise audio-description style narration cues for the following archival audiovisual item.
+    Focus on visual content, on-screen text, and speaker changes.
+    Transcript:
+    {transcript}
+    Visual descriptions:
+    {frame_descriptions}
+  system_prompt: >
+    You produce accessible, neutral narration cues. Avoid interpretation; describe observable content.
+  frame_descriptions_missing_fallback: "No visual descriptions available."
+
+# Optional HTML preview dashboard (used by build_preview.py)
+preview_dashboard:
+  enabled: false
+  output_path: "preview/index.html"
+  max_items: 50
+  include_frames: true
+  include_summaries: true
+  include_tags: true
+  include_metadata: true
+  static_assets_dir: "preview/assets"
+  css_file: null
+
+# Quality control metrics (used by quality_metrics.py)
+quality_control:
+  enabled: false
+  output_csv: "quality_metrics.csv"
+  summary_dir: "summaries"
+  transcript_dir: null
+  transcript_format: "txt"
+  frame_descriptions_dirs: null
+  min_summary_words: 30
+  max_summary_words: 70
+
+# Provenance logging (used by run_pipeline.py)
+provenance:
+  enabled: true
+  log_path: "provenance_log.jsonl"
+
+# IIIF manifest generation (used by build_iiif_manifest.py)
+iiif:
+  enabled: false
+  manifest_output: "iiif/manifest.json"
+  frames_root: null
+  base_media_url: "https://example.org/media"
+  base_frame_url: "https://example.org/frames"
+  metadata_fields: ["ELECTION", "PARTY", "TITLE"]
+
+# Catalog export (used by export_catalog.py)
+catalog_export:
+  enabled: false
+  output_csv: "catalog_export.csv"
+  include_transcript_excerpt: true
+  transcript_excerpt_chars: 500
+  include_summary: true
+  include_tags: true
+
+# Search index (used by build_search_index.py)
+search_index:
+  enabled: false
+  sqlite_path: "search_index.db"
+  include_transcripts: true
+  include_summaries: true
+  include_tags: true
+
+# Visual clustering (used by cluster_visuals.py)
+clustering:
+  enabled: false
+  model: "text-embedding-3-small"
+  api_key_env: "OPENAI_API_KEY"
+  frame_descriptions_dirs: null
+  output_dir: "clusters"
+  overwrite: false
+  n_clusters: 20
+  max_items: 2000
+
+# Workflow orchestration (used by run_pipeline.py)
+workflow:
+  steps:
+    - transcribe
+    - keyframes
+    - describe_frames
+    - summarize
+    - tags
+    - accessibility
+    - collection_report
+    - quality_metrics
+    - iiif
+    - catalog_export
+    - search_index
+    - clustering
+
+# Optional GPT summarization settings (used by summarize_collection.py)
+summarization:
+  enabled: false                           # set to true when you want to generate summaries
+  model: "gpt-4o-mini"                     # any chat-capable OpenAI model
+  word_limit: 60
+  system_prompt: >
+    You are an assistant that writes concise, neutral descriptions of archival audiovisual materials.
+    Summaries must fit within the requested word limit and avoid sensationalism.
+  prompt_template: |
+    Provide a {word_limit}-word summary of the archival audiovisual item described below.
+    {metadata_block}
+    Transcript:
+    {transcript}
+    Visual descriptions:
+    {frame_descriptions}
+  transcript_format: "txt"                 # which transcript format to read ('txt', 'json', etc.)
+  transcripts_subdir: null                 # override auto-detected transcript directory (optional)
+  max_transcript_chars: 12000              # truncate very long transcripts before summarization
+  output_dir: "summaries"                  # written alongside outputs.base_dir if relative
+  overwrite: false                         # skip summaries that already exist
+  api_key_env: "OPENAI_API_KEY"            # environment variable that holds your API key
+  metadata_csv: null                       # optional CSV with contextual columns
+  metadata_id_column: "ID"
+  metadata_fields: ["ELECTION", "PARTY", "FIRST_NAME", "LAST_NAME", "TITLE"]
+  metadata_missing_fallback: "Archival metadata unavailable."
+  use_frame_descriptions: false            # include frame descriptions when present
+  frame_descriptions_dirs: null            # override auto-detected description directories (list)
+  frame_descriptions_limit: 20
+  frame_entry_template: "{idx}. ({timestamp:.1f}s) {description}"
+  frame_block_template: |
+    Visual key points:
+    {frames}
+  frame_descriptions_missing_fallback: "No frame descriptions available."
+  temperature: 0.2
+
+# Logging and progress output
+logging:
+  verbose: false
+  progress_interval: 5                     # print status every N files completed per rank
+
