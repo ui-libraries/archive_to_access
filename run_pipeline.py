@@ -10,6 +10,9 @@ from typing import Dict, List
 import yaml
 
 
+SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
 def expand_path(path: str) -> str:
     return os.path.abspath(os.path.expanduser(path))
 
@@ -23,32 +26,37 @@ def load_config(path: str) -> Dict:
 
 
 PIPELINE_CMDS = {
-    "transcribe": ["parallel_transcription_tool/transcribe_collection.py"],
-    "keyframes": ["parallel_transcription_tool/extract_keyframes.py"],
-    "describe_frames": ["parallel_transcription_tool/describe_frames.py"],
-    "summarize": ["parallel_transcription_tool/summarize_collection.py"],
-    "tags": ["parallel_transcription_tool/generate_tags.py"],
-    "accessibility": ["parallel_transcription_tool/generate_accessibility.py"],
-    "collection_report": ["parallel_transcription_tool/collection_report.py"],
-    "preview": ["parallel_transcription_tool/build_preview.py"],
-    "quality_metrics": ["parallel_transcription_tool/quality_metrics.py"],
-    "iiif": ["parallel_transcription_tool/build_iiif_manifest.py"],
-    "catalog_export": ["parallel_transcription_tool/export_catalog.py"],
-    "search_index": ["parallel_transcription_tool/build_search_index.py"],
-    "clustering": ["parallel_transcription_tool/cluster_visuals.py"],
+    "transcribe": "transcribe_collection.py",
+    "keyframes": "extract_keyframes.py",
+    "describe_frames": "describe_frames.py",
+    "summarize": "summarize_collection.py",
+    "tags": "generate_tags.py",
+    "accessibility": "generate_accessibility.py",
+    "collection_report": "collection_report.py",
+    "preview": "build_preview.py",
+    "quality_metrics": "quality_metrics.py",
+    "iiif": "build_iiif_manifest.py",
+    "catalog_export": "export_catalog.py",
+    "search_index": "build_search_index.py",
+    "clustering": "cluster_visuals.py",
 }
 
 
+def resolve_script(script: str) -> str:
+    return os.path.join(SCRIPT_ROOT, script)
+
+
 def run_step(step: str, config_path: str, mpirun: bool, ranks: int, provenance: Dict) -> bool:
-    cmd = PIPELINE_CMDS.get(step)
-    if not cmd:
+    script = PIPELINE_CMDS.get(step)
+    if not script:
         print(f"[run_pipeline] Unknown step '{step}', skipping.")
         return False
 
+    script_path = resolve_script(script)
     if mpirun:
-        command = ["mpirun", "-np", str(ranks), "python"] + cmd + ["--config", config_path]
+        command = ["mpirun", "-np", str(ranks), "python", script_path, "--config", config_path]
     else:
-        command = ["python"] + cmd + ["--config", config_path]
+        command = ["python", script_path, "--config", config_path]
 
     print(f"\n[run_pipeline] Running step '{step}': {' '.join(command)}")
     start = time.time()

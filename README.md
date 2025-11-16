@@ -1,6 +1,6 @@
 # Parallel AV Transcription Toolkit
 
-An MPI-friendly transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on the `AI-SummarizeVid` project’s lessons learned, but pares things down to a configurable, transcript-first utility.
+An MPI-friendly transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on `https://github.com/BreuerLabs/AI-SummarizeVid` 
 
 ## What This Provides
 - **Parallel transcription**: Scan large audio/video collections (optional recursion) and distribute work across MPI ranks.
@@ -17,52 +17,52 @@ An MPI-friendly transcription workflow designed for digital librarians, archivis
    ```bash
    brew install ffmpeg open-mpi        # macOS example
    python3 -m venv .venv && source .venv/bin/activate
-   pip install -r parallel_transcription_tool/requirements.txt
+   pip install -r requirements.txt
    ```
 
 2. **Prepare a configuration**
    ```bash
-   cp parallel_transcription_tool/config-example.yaml config.yaml
+   cp config-example.yaml config.yaml
    # edit config.yaml so the paths match your collection and desired outputs
    ```
 
 3. **Launch a transcription run**
    ```bash
-   mpirun -np 8 python parallel_transcription_tool/transcribe_collection.py --config config.yaml
+   mpirun -np 8 python transcribe_collection.py --config config.yaml
    ```
 
 4. **(Optional) Extract keyframes**
    ```bash
-   mpirun -np 8 python parallel_transcription_tool/extract_keyframes.py --config config.yaml
+   mpirun -np 8 python extract_keyframes.py --config config.yaml
    ```
 
 5. **(Optional) Describe frames with GPT-Vision**
    ```bash
-   mpirun -np 8 python parallel_transcription_tool/describe_frames.py --config config.yaml
+   mpirun -np 8 python describe_frames.py --config config.yaml
    ```
 
 6. **(Optional) Launch summarization**
    ```bash
-   mpirun -np 8 python parallel_transcription_tool/summarize_collection.py --config config.yaml
+   mpirun -np 8 python summarize_collection.py --config config.yaml
    ```
    Make sure your OpenAI API key is set (see `summarization.api_key_env` in the config).
 
 7. **Layer in metadata, discovery, and exports**
    ```bash
-   mpirun -np 8 python parallel_transcription_tool/generate_tags.py --config config.yaml
-   mpirun -np 8 python parallel_transcription_tool/generate_accessibility.py --config config.yaml
-   python parallel_transcription_tool/collection_report.py --config config.yaml
-   python parallel_transcription_tool/build_preview.py --config config.yaml
-   python parallel_transcription_tool/quality_metrics.py --config config.yaml
-   python parallel_transcription_tool/build_iiif_manifest.py --config config.yaml
-   python parallel_transcription_tool/export_catalog.py --config config.yaml
-   python parallel_transcription_tool/build_search_index.py --config config.yaml
-   python parallel_transcription_tool/cluster_visuals.py --config config.yaml
+   mpirun -np 8 python generate_tags.py --config config.yaml
+   mpirun -np 8 python generate_accessibility.py --config config.yaml
+   python collection_report.py --config config.yaml
+   python build_preview.py --config config.yaml
+   python quality_metrics.py --config config.yaml
+   python build_iiif_manifest.py --config config.yaml
+   python export_catalog.py --config config.yaml
+   python build_search_index.py --config config.yaml
+   python cluster_visuals.py --config config.yaml
    ```
 
 8. **Orchestrate everything**
    ```bash
-   python parallel_transcription_tool/run_pipeline.py --config config.yaml
+   python run_pipeline.py --config config.yaml
    ```
 
 ## Configuration Overview
@@ -90,6 +90,18 @@ The YAML file controls several areas:
 | `logging` | Verbosity controls and how often to print progress. |
 
 See `config-example.yaml` for inline documentation of each field.
+
+## Gold-Standard Preset
+The repository includes `config-gold-standard.yaml`, a preset that mirrors the original four-stage AI-SummarizeVid workflow (Whisper transcripts, speech + interval keyframes, GPT-Vision descriptions, and 50-word GPT summaries). To use it:
+
+1. Copy the file to `config.yaml` (or pass it directly via `--config`), then edit `input.media_root` so it points at your collection. Update `metadata_csv` entries if you want metadata-aware prompts.
+2. Set `OPENAI_API_KEY` in your environment before running frame-description or summarization steps.
+3. Launch the end-to-end run:
+   ```bash
+   mpirun -np 8 python run_pipeline.py --config config-gold-standard.yaml
+   ```
+
+The preset writes transcripts, keyframes, GPT frame descriptions, and GPT summaries into `outputs/transcripts_gold`, `outputs/keyframes_gold`, `outputs/frame_descriptions_gold`, and `outputs/summaries_gold`, and it enforces 3-second interval sampling (capped at 60 frames) with the published prompt language to ensure behavioral parity.
 
 ## Optional Audio Normalization
 `ffmpeg` preprocessing is helpful when collections contain a patchwork of legacy formats—normalizing sample rate, channel layout, and codecs improves transcription consistency and avoids Whisper’s fallback re-encoding. If your collection is already stored as modern MP4/MKV with AAC stereo audio, you can disable preprocessing to skip that extra I/O.
@@ -129,7 +141,7 @@ Filenames mirror the relative path of each media asset with directory separators
 ## Extending the Workflow
 - Swap Whisper model sizes (`base`, `small`, `medium`, `large-v3`) in the config to balance quality and runtime.
 - Feed the generated transcripts into your own discovery interfaces or cataloging systems.
-- Combine with the existing `AI-SummarizeVid` steps if you later decide to storyboard frames or generate multimodal summaries.
+- Enable the gold-standard preset when you want the full storyboard + summary flow from the published AI-SummarizeVid workflow.
 
 For questions or suggestions, file an issue or adapt the scripts directly—everything is contained within this folder.
 

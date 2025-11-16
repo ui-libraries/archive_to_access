@@ -1,0 +1,145 @@
+###############################################################
+# Gold-standard configuration inspired by the AI-SummarizeVid
+# workflow. Copy this file to config.yaml and update the paths
+# (especially `input.media_root`) before running the pipeline.
+###############################################################
+
+input:
+  media_root: "/absolute/path/to/media"
+  include_extensions: [".mp4", ".mov", ".mkv"]
+  recurse: false
+
+preprocessing:
+  extract_audio: false
+  audio_dir: null
+
+transcription:
+  model: "large-v3"
+  device: "auto"
+  temperature: 0.0
+  condition_on_previous_text: true
+  initial_prompt: null
+  suppress_tokens: "-1"
+
+outputs:
+  base_dir: "outputs/transcripts_gold"
+  formats: ["txt", "tsv", "json"]
+  overwrite: false
+  writer_options:
+    max_line_width: null
+    max_line_count: null
+    highlight_words: false
+
+keyframes:
+  enabled: true
+  modes: ["speech_segments", "interval"]
+  output_dir: "outputs/keyframes_gold"
+  overwrite: false
+  image_extension: "jpg"
+  jpeg_quality: 2
+  interval_seconds: 3.0
+  max_interval_frames: 60
+  speech_segment_format: "tsv"
+  speech_segment_dir: null        # defaults to the TSV transcript directory
+  max_total_frames: null
+
+frame_descriptions:
+  enabled: true
+  model: "gpt-4o"
+  api_key_env: "OPENAI_API_KEY"
+  frames_root: "outputs/keyframes_gold"
+  output_dir: "outputs/frame_descriptions_gold"
+  overwrite: false
+  max_frames_per_item: 80
+  max_transcript_chars: 6000
+  temperature: 0.2
+  prompt_template: |
+    Describe what is depicted in this video frame in no more than 15 words.
+    Do not mention ad age or image quality. If the frame contains text, note it
+    and paraphrase the wording. Context:
+    {metadata_block}
+    Transcript excerpt:
+    {transcript}
+    Timestamp: {timestamp_seconds:.2f} seconds.
+  system_prompt: >
+    You are an archivist describing historical campaign ads. Be neutral,
+    concise, and factual. Mention visible text verbatim whenever possible.
+  metadata_csv: null              # set to your metadata file if available
+  metadata_id_column: "ID"
+  metadata_fields: ["ELECTION", "PARTY", "FIRST_NAME", "LAST_NAME", "TITLE"]
+  metadata_missing_fallback: "Archival metadata unavailable."
+  transcript_format: "txt"
+  transcripts_subdir: null        # defaults to the TXT transcript directory
+  transcript_missing_fallback: "Transcript unavailable."
+
+summarization:
+  enabled: true
+  model: "gpt-4o"
+  api_key_env: "OPENAI_API_KEY"
+  word_limit: 50
+  temperature: 0.2
+  transcript_format: "txt"
+  transcripts_subdir: null        # defaults to the TXT transcript directory
+  max_transcript_chars: 12000
+  output_dir: "outputs/summaries_gold"
+  overwrite: false
+  metadata_csv: null              # set to your metadata file if available
+  metadata_id_column: "ID"
+  metadata_fields: ["ELECTION", "PARTY", "FIRST_NAME", "LAST_NAME", "TITLE"]
+  metadata_missing_fallback: "Archival metadata unavailable."
+  use_frame_descriptions: true
+  frame_descriptions_dirs: null   # defaults to frame_descriptions.output_dir
+  frame_descriptions_limit: 40
+  frame_entry_template: "{idx}. ({timestamp:.1f}s) {description}"
+  frame_block_template: |
+    The ad's ordered scene descriptions:
+    {frames}
+  frame_descriptions_missing_fallback: "No frame descriptions available."
+  prompt_template: |
+    Provide a {word_limit}-word summary of a political television ad for the
+    academic community. Your summary must not exceed {word_limit} words.
+    {metadata_block}
+    Transcript:
+    {transcript}
+
+    The ad video depicts the following scenes:
+    {frame_descriptions}
+
+tagging:
+  enabled: false
+
+collection_reports:
+  enabled: false
+
+accessibility:
+  enabled: false
+
+preview_dashboard:
+  enabled: false
+
+quality_control:
+  enabled: false
+
+iiif:
+  enabled: false
+
+catalog_export:
+  enabled: false
+
+search_index:
+  enabled: false
+
+clustering:
+  enabled: false
+
+workflow:
+  steps:
+    - transcribe
+    - keyframes
+    - describe_frames
+    - summarize
+
+logging:
+  verbose: false
+  progress_interval: 5
+
