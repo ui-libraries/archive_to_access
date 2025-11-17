@@ -143,5 +143,3 @@ Filenames mirror the relative path of each media asset with directory separators
 - Feed the generated transcripts into your own discovery interfaces or cataloging systems.
 - Enable the gold-standard preset when you want the full storyboard + summary flow from the published AI-SummarizeVid workflow.
 
-For questions or suggestions, file an issue or adapt the scripts directly—everything is contained within this folder.
-
